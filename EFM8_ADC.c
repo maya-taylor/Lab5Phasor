@@ -237,10 +237,10 @@ void main (void)
     InitADC();
 
 
-	ADC0MX=VREF_PIN;
-	ADINT = 0;
-	ADBUSY=1;
-	while (!ADINT); // Wait for conversion to complete
+	//ADC0MX=VREF_PIN;
+	//ADINT = 0;
+	//ADBUSY=1;
+	//while (!ADINT); // Wait for conversion to complete
 		
 
 	while(1)
@@ -259,10 +259,10 @@ void main (void)
 		overflow_count=0;
 
 
-		while (Get_ADC()!=0); // Wait for the signal to be zero
-		while (Get_ADC()==0); // Wait for the signal to be positive
+		while (ADC_at_Pin(VREF_PIN)!=0); // Wait for the signal to be zero
+		while (ADC_at_Pin(VREF_PIN)==0); // Wait for the signal to be positive
 		TR0=1; // Start the timer 0
-		while (Get_ADC()!=0) // Wait for the signal to be zero again
+		while (ADC_at_Pin(VREF_PIN)!=0) // Wait for the signal to be zero again
 		{
 			if(TF0==1) // Did the 16-bit timer overflow?
 			{
@@ -271,15 +271,55 @@ void main (void)
 			}
 		}
 		TR0=0; // Stop timer 0
-		half_period=TH0*256.0+TL0; // The 16-bit number [TH0-TL0]
+		//half_period=TH0*256.0+TL0; // The 16-bit number [TH0-TL0]
 		
 		period=2*(overflow_count*65536.0+TH0*256.0+TL0)*(12.0/SYSCLK);
 
 		printf("Period = %7.5fms\r\n", period*1000);
 
 		// Time from the beginning of the sine wave to its peak
-		max_v_time=65536-(perio/2);
+		//max_v_time=65536-(period/4);
+		max_v_time = period/4.0;
+
+		while (ADC_at_Pin(VREF_PIN)!=0); // Wait for the signal to be zero
+		while (ADC_at_Pin(VREF_PIN)==0); // Wait for the signal to be positive
+		waitms(max_v_time*1000);
+		ref_max_v = Volts_at_Pin(VREF_PIN);
+
+		printf("Ref Max = %7.5fV\r\n", ref_max_v);
+
+		while (ADC_at_Pin(VINP_PIN)!=0); // Wait for the signal to be zero
+		while (ADC_at_Pin(VINP_PIN)==0); // Wait for the signal to be positive
+		waitms(max_v_time*1000);
+		inp_max_v = Volts_at_Pin(VINP_PIN);
+
+		printf("Inp Max = %7.5fV\r\n", inp_max_v);
+		
 
 
+		// Reset the counter
+		TL0=0; 
+		TH0=0;
+		TF0=0;
+		overflow_count=0;
+
+		while (ADC_at_Pin(VREF_PIN)!=0); // Wait for the signal to be zero
+		TR0=1; // Start the timer 0
+		while (ADC_at_Pin(VINP_PIN)!=0) // Wait for the signal to be positive
+		{
+			if(TF0==1) // Did the 16-bit timer overflow?
+			{
+				TF0=0;
+				overflow_count++;
+			}
+		}
+		TR0=0;
+		peak_diff=(overflow_count*65536.0+TH0*256.0+TL0)*(12.0/SYSCLK);
+		phase = peak_diff * 360.0 / period;
+
+		printf("Phase = %7.5fV\r\n", phase);
+
+
+		waitms(1000);
 	 }  
 }	
