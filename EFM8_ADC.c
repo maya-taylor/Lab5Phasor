@@ -13,6 +13,10 @@
 #define SYSCLK 72000000L
 #define BAUDRATE 115200L
 #define SARCLK 18000000L
+#define VREF_PIN QFP32_MUX_P2_5
+#define VINP_PIN QFP32_MUX_P2_6
+
+unsigned char overflow_count;
 
 char _c51_external_startup (void)
 {
@@ -178,6 +182,13 @@ void InitPinADC (unsigned char portno, unsigned char pinno)
 	SFRPAGE = 0x00;
 }
 
+void TIMER0_Init(void)
+{
+	TMOD&=0b_1111_0000; // Set the bits of Timer/Counter 0 to zero
+	TMOD|=0b_0000_0001; // Timer/Counter 0 used as a 16-bit timer
+	TR0=0; // Stop Timer/Counter 0
+}
+
 unsigned int ADC_at_Pin(unsigned char pin)
 {
 	ADC0MX = pin;   // Select input from pin
@@ -187,6 +198,15 @@ unsigned int ADC_at_Pin(unsigned char pin)
 	return (ADC0);
 }
 
+unsigned int Get_ADC (void)
+{
+	ADINT = 0;
+	ADBUSY = 1;
+	while (!ADINT); // Wait for conversion to complete
+	return (ADC0);
+}
+
+
 float Volts_at_Pin(unsigned char pin)
 {
 	 return ((ADC_at_Pin(pin)*VDD)/0b_0011_1111_1111_1111);
@@ -194,31 +214,72 @@ float Volts_at_Pin(unsigned char pin)
 
 void main (void)
 {
-	float v[4];
+	//float v_ref;
+	//float v_inp;
+	float half_period;
+	float period;
+	float ref_max_v;
+	float inp_max_v;
+	float max_v_time;
+
+	TIMER0_Init();
 
     waitms(500); // Give PuTTy a chance to start before sending
 	printf("\x1b[2J"); // Clear screen using ANSI escape sequence.
 	
-	printf ("ADC test program\n"
+	printf("ADC test program\n"
 	        "File: %s\n"
 	        "Compiled: %s, %s\n\n",
 	        __FILE__, __DATE__, __TIME__);
-	
-	InitPinADC(2, 2); // Configure P2.2 as analog input
-	InitPinADC(2, 3); // Configure P2.3 as analog input
-	InitPinADC(2, 4); // Configure P2.4 as analog input
+
 	InitPinADC(2, 5); // Configure P2.5 as analog input
+	InitPinADC(2, 6); // Configure P2.5 as analog input
     InitADC();
+
+
+	ADC0MX=VREF_PIN;
+	ADINT = 0;
+	ADBUSY=1;
+	while (!ADINT); // Wait for conversion to complete
+		
 
 	while(1)
 	{
 	    // Read 14-bit value from the pins configured as analog inputs
-		v[0] = Volts_at_Pin(QFP32_MUX_P2_2);
-		v[1] = Volts_at_Pin(QFP32_MUX_P2_3);
-		v[2] = Volts_at_Pin(QFP32_MUX_P2_4);
-		v[3] = Volts_at_Pin(QFP32_MUX_P2_5);
-		printf ("V@P2.2=%7.5fV, V@P2.3=%7.5fV, V@P2.4=%7.5fV, V@P2.5=%7.5fV\r", v[0], v[1], v[2], v[3]);
-		waitms(500);
+		//v_ref = Volts_at_Pin(VREF_PIN);
+		//v_inp = Volts_at_Pin(VINP_PIN);
+		//printf("V@P2.5=%7.5fV, V@P2.6=%7.5fV\r\n", v_ref, v_inp);
+		//waitms(10);
+
+
+		// Reset the counter
+		TL0=0; 
+		TH0=0;
+		TF0=0;
+		overflow_count=0;
+
+
+		while (Get_ADC()!=0); // Wait for the signal to be zero
+		while (Get_ADC()==0); // Wait for the signal to be positive
+		TR0=1; // Start the timer 0
+		while (Get_ADC()!=0) // Wait for the signal to be zero again
+		{
+			if(TF0==1) // Did the 16-bit timer overflow?
+			{
+				TF0=0;
+				overflow_count++;
+			}
+		}
+		TR0=0; // Stop timer 0
+		half_period=TH0*256.0+TL0; // The 16-bit number [TH0-TL0]
+		
+		period=2*(overflow_count*65536.0+TH0*256.0+TL0)*(12.0/SYSCLK);
+
+		printf("Period = %7.5fms\r\n", period*1000);
+
+		// Time from the beginning of the sine wave to its peak
+		max_v_time=65536-(perio/2);
+
+
 	 }  
 }	
-
