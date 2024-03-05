@@ -289,13 +289,14 @@ void LCDprint(char * string, unsigned char line, bit clear)
 
 void main (void)
 {
-	float period;
+	float period=0;
 	float ref_max_v = 0;
 	float inp_max_v = 0;
 	float max_v_time;
 	float peak_diff;
 	float phase = 0;
 	
+	float prevPer;
 	float prevRefV;
 	float prevInpV;
 	float prevPhase;
@@ -304,6 +305,7 @@ void main (void)
 	char l2buff[16];
 
 	TIMER0_Init();
+	LCD_4BIT();
 
     waitms(500); // Give PuTTy a chance to start before sending
 	printf("\x1b[2J"); // Clear screen using ANSI escape sequence.
@@ -353,7 +355,7 @@ void main (void)
 		}
 		TR0=0; // Stop timer 0
 		//half_period=TH0*256.0+TL0; // The 16-bit number [TH0-TL0]
-		
+		prevPer=period;
 		period=2*(overflow_count*65536.0+TH0*256.0+TL0)*(12.0/SYSCLK);
 
 		//printf("Period = %7.5fms\r\n", period*1000);
@@ -375,6 +377,7 @@ void main (void)
 		waitms(max_v_time*1000);
 		prevInpV=inp_max_v;
 		inp_max_v = Volts_at_Pin(VINP_PIN);
+
 
 		//printf("Inp Max = %7.5fV\r\n", inp_max_v);
 		
@@ -409,6 +412,16 @@ void main (void)
 		prevPhase = phase;
 		phase = peak_diff * 360.0 / period;
        
+		if (ref_max_v < 0.01) {
+			ref_max_v=prevRefV;
+			period=prefPer;
+		}
+		
+		if (inp_max_v < 0.01) {
+			inp_max_v=prevInpV;
+			phase = prevPhase;
+		}
+
        	if (phase > 360) {
        		phase = prevPhase;
        		ref_max_v = prevRefV;
@@ -421,11 +434,11 @@ void main (void)
 		//printf("Diff = %7.5fms\r\n", peak_diff*1000);
 		//printf("Phase = %7.5fdeg\r\n\n", phase);
 		
-		printf("%.3f %.3f %.3f\r\n", ref_max_v, inp_max_v, phase);
+		printf("%.3f %.3f %.3f %.3f\r\n", ref_max_v, inp_max_v, period*1000, phase);
 		
 		
 
-		sprintf(l1buff, "R=%.2fV I=%.2fV", ref_max_v, inp_max_v);
+		sprintf(l1buff, "R=%.2fV I=%.2fV", ref_max_v/1.41421356237, inp_max_v/1.41421356237);
 		LCDprint(l1buff, 1, 1);
 
 		sprintf(l2buff, "Phase=%.2fdeg", phase);
