@@ -414,12 +414,16 @@ void main (void)
        
 		if (ref_max_v < 0.01) {
 			ref_max_v=prevRefV;
-			period=prefPer;
+			period=prevPer;
 		}
 		
 		if (inp_max_v < 0.01) {
 			inp_max_v=prevInpV;
 			phase = prevPhase;
+		}
+
+		if (period < 0.003) {
+			period=prevPer;
 		}
 
        	if (phase > 360) {

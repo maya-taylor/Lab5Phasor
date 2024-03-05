@@ -7,9 +7,12 @@
 from matplotlib.animation import FuncAnimation
 from matplotlib.patches import ConnectionPatch
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import sys, time, math
 import numpy as np
 import serial
+
+
 
 #for the sounds
 from scipy.io.wavfile import write
@@ -74,6 +77,11 @@ line2, = ax_sine.plot([], [])
 line1.set_color('orange')
 line2.set_color('blue')
 
+red_patch = mpatches.Patch(color='orange', label='Reference Voltage')
+blue_patch = mpatches.Patch(color='blue', label='Input Voltage')
+
+plt.legend(handles=[red_patch, blue_patch])
+
 # Limits
 ax_sine.set_xlim((0, X_MAX))
 ax_sine.set_ylim((-1.5, 1.5))
@@ -95,6 +103,7 @@ ax_sine.plot(1, 0, ls='', marker=5, ms=5, color='k',
              transform=ax_sine.get_yaxis_transform(), clip_on=False)
 ax_sine.plot(0, 1, ls='', marker=6, ms=5, color='k',
              transform=ax_sine.get_xaxis_transform(), clip_on=False)
+
 
 # Axes for phasor
 ax_phasor.set_ylim((-1.5, 1.5))
@@ -119,23 +128,22 @@ ax_phasor.add_patch(plt.Circle(
 
 # Lines and arrows
 phasor1 = ax_phasor.arrow(0, 0, 0, 0)
-#horiz_connector1 = ConnectionPatch(
-#    xyA=(-1, 0), xyB=(0, 0),
-#    coordsA='data', coordsB='data', axesA=ax_phasor, axesB=ax_sine,
-#    ls='--', edgecolor='darkgray'
-#)
-#ax_sine.add_artist(horiz_connector1)
+horiz_connector1 = ConnectionPatch(
+    xyA=(-1, 0), xyB=(0, 0),
+    coordsA='data', coordsB='data', axesA=ax_phasor, axesB=ax_sine,
+    ls='--', edgecolor='darkgray'
+)
+ax_sine.add_artist(horiz_connector1)
 
 phasor2 = ax_phasor.arrow(0, 0, 0, 0)
-#horiz_connector2 = ConnectionPatch(
-#    xyA=(-1, 0), xyB=(0, 0),
-#    coordsA='data', coordsB='data', axesA=ax_phasor, axesB=ax_sine,
-#    ls='--', edgecolor='darkgray'
-#)
-#ax_sine.add_artist(horiz_connector2)
+horiz_connector2 = ConnectionPatch(
+    xyA=(-1, 0), xyB=(0, 0),
+    coordsA='data', coordsB='data', axesA=ax_phasor, axesB=ax_sine,
+    ls='--', edgecolor='darkgray'
+)
+ax_sine.add_artist(horiz_connector2)
 
-t1 = ax_sine.text(2,1,f"Hello", bbox=dict(facecolor='white',edgecolor='gray', boxstyle='round', alpha=0.5))
-
+t1 = ax_sine.text(2.4,-1,f"Frequency = {0}Hz\nInput Vrms = {0}V\nReference Vrms = {0}V\nPhase = {0}°", bbox=dict(facecolor='white',edgecolor='lightgray', boxstyle='round', alpha=1))
 
 def _init():
     line1.set_data([], [])
@@ -153,24 +161,16 @@ def _anim(i):
     ph=strin[18:]
 
     x = np.linspace(0, X_MAX, 1000)
-    y1 = float(vr)/2.5*np.sin(2 * np.pi * (x - 0.01 * i))
-    y2 = float(vi)/2.5*np.sin(2 * np.pi * (x - 0.01 * i) + np.pi*float(ph)/180.0)
+    y1 = float(vr)/2.5*np.sin(2 * np.pi * 10.0/float(per) * (x - 0.01 * i))
+    y2 = float(vi)/2.5*np.sin(2 * np.pi * 10.0/float(per) * (x - 0.01 * i) + np.pi*float(ph)/180.0)
     line1.set_data(x, y1)
     line2.set_data(x, y2)
     
-    #mayas edits
-    #l3.get_texts()[0].set_text(f"Heartrate = 0 BPM")
-    #l4.get_texts()[0].set_text(f"Avg Heartrate = 0 BPM")
-    #line3, = ax_sine.plot([], [], label='BPM', lw=2)
-    #line4, = ax_sine.plot([], [], label='BPMavg', lw=2)
-    #l3 = ax_sine.legend(handles = [line3], loc = 1)
-    #ax_sine.add_artist(l3)
-    #l4 = ax_sine.legend(handles=[line4], loc = 4)
-    t1.set_text(f"Period = {per}")
+    t1.set_text(f"Frequency = {round(1000.0/float(per),2)}Hz\nInput Vrms = {round(float(vi)/1.41,2)}V\nReference Vrms = {round(float(vr)/1.41,2)}V\nPhase = {float(ph)}°")
 
     #linspace for sounds -- will make them start with a
     t = np.linspace(0,length, length*AUDIO_RATE, dtype = np.float32)
-    ya = float(vr)/2.5*np.sin(2 * np.pi * a_freq*t) + float(vi)/2.5*np.sin(2*np.pi* a_freq*t - np.pi*float(ph)/180.0)
+    ya = float(vr)/2.5*np.sin(2*np.pi*(2.5*1000.0/float(per)*t)) + float(vi)/2.5*np.sin(2*np.pi*(2.5*1000.0/float(per)*t) - np.pi*float(ph)/180.0)
     #save to wave file
     write("sine.wav", AUDIO_RATE,ya)
     sine_file = "C:\\Users\\maya2\\Documents\\GitHub\\Lab5Phasor\\sine.wav"
@@ -178,7 +178,7 @@ def _anim(i):
     sine_sound.play()
     
     phasor1_coordinates = rotate_tail(
-        0, 0, float(vr)/2.5, -1 * (i / 100) * 360 - 90
+        0, 0, float(vr)/2.5, -1 * 10.0/float(per) * (i / 100) * 360 - 90
     )
     phasor1_tail = (
         phasor1_coordinates[0] + phasor1_coordinates[2],      # x
@@ -189,25 +189,21 @@ def _anim(i):
     phasor1.remove()
     phasor1 = ax_phasor.arrow(
         *phasor1_coordinates,
-        fc='tab:orange', ec='tab:orange',
+        fc='orange', ec='orange',
         head_width=0.05, head_length=0.1, length_includes_head=True
     )
 
-    #global horiz_connector1
-    #horiz_connector1.remove()
-    #horiz_connector1 = ConnectionPatch(
-    #    xyA=(phasor1_tail[0], phasor1_tail[1]), xyB=(0, phasor1_tail[1]),
-    #    coordsA='data', coordsB='data', axesA=ax_phasor, axesB=ax_sine,
-    #    ls='--', edgecolor='darkgray'
-    #)
-    #ax_sine.add_patch(horiz_connector1)
-    # Update coordinates of horiz_connector1
-    #horiz_connector1.set_positions((phasor1_tail[0], phasor1_tail[1]), (0, phasor1_tail[1]))   
-    #horiz_connector1.set_xy(np.array([[phasor1_tail[0], phasor1_tail[1]], [0, phasor1_tail[1]]]))
-
+    global horiz_connector1
+    horiz_connector1.remove()
+    horiz_connector1 = ConnectionPatch(
+        xyA=(phasor1_tail[0], phasor1_tail[1]), xyB=(0, phasor1_tail[1]),
+        coordsA='data', coordsB='data', axesA=ax_phasor, axesB=ax_sine,
+        ls='--', edgecolor='darkgray'
+    )
+    ax_sine.add_patch(horiz_connector1)
 
     phasor2_coordinates = rotate_tail(
-        0, 0, float(vi)/2.5, -1 * (i / 100) * 360 - 90 + float(ph)
+        0, 0, float(vi)/2.5, -1 * 10.0/float(per) *(i / 100) * 360 - 90 + float(ph)
     )
     phasor2_tail = (
         phasor2_coordinates[0] + phasor2_coordinates[2],      # x
@@ -218,28 +214,25 @@ def _anim(i):
     phasor2.remove()
     phasor2 = ax_phasor.arrow(
         *phasor2_coordinates,
-        fc='tab:blue', ec='tab:blue',
+        fc='blue', ec='blue',
         head_width=0.05, head_length=0.1, length_includes_head=True
     )
 
-    #global horiz_connector2
-    #horiz_connector2.remove()
-    #horiz_connector2 = ConnectionPatch(
-    #    xyA=(phasor2_tail[0], phasor2_tail[1]), xyB=(0, phasor2_tail[1]),
-    #    coordsA='data', coordsB='data', axesA=ax_phasor, axesB=ax_sine,
-    #    ls='--', edgecolor='darkgray'
-    #)
-    #ax_sine.add_patch(horiz_connector2)
-    #horiz_connector2.set_positions((phasor2_tail[0], phasor2_tail[1]), (0, phasor2_tail[1]))   
-
-
-
-    return (line1, line2, phasor1, phasor2) #horiz_connector1, , horiz_connector2
+    global horiz_connector2
+    horiz_connector2.remove()
+    horiz_connector2 = ConnectionPatch(
+        xyA=(phasor2_tail[0], phasor2_tail[1]), xyB=(0, phasor2_tail[1]),
+        coordsA='data', coordsB='data', axesA=ax_phasor, axesB=ax_sine,
+        ls='--', edgecolor='darkgray'
+    )
+    ax_sine.add_patch(horiz_connector2)
+    
+    return (line1, line2, phasor1, horiz_connector1, phasor2, horiz_connector2) 
 
 
 # Animate
 anim = FuncAnimation(fig, _anim, init_func=_init, frames=100, interval=16,
-                     blit=True)
+                     blit=False)
 #anim.save('videos/ac/freqdiff_phasor_and_sine.gif', writer='imagemagick')
 
 plt.show()
