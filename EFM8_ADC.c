@@ -16,6 +16,15 @@
 #define VREF_PIN QFP32_MUX_P2_5
 #define VINP_PIN QFP32_MUX_P2_6
 
+#define LCD_RS P1_7
+#define LCD_E P2_0
+#define LCD_D4 P1_3
+#define LCD_D5 P1_2
+#define LCD_D6 P1_1
+#define LCD_D7 P1_0
+#define CHARS_PER_LINE 16
+
+
 unsigned char overflow_count;
 
 char _c51_external_startup (void)
@@ -212,15 +221,87 @@ float Volts_at_Pin(unsigned char pin)
 	 return ((ADC_at_Pin(pin)*VDD)/0b_0011_1111_1111_1111);
 }
 
+
+void LCD_pulse (void)
+{
+	LCD_E=1;
+	Timer3us(40);
+	LCD_E=0;
+}
+
+void LCD_byte (unsigned char x)
+{
+	// The accumulator in the C8051Fxxx is bit addressable!
+	ACC=x; //Send high nible
+	LCD_D7=ACC_7;
+	LCD_D6=ACC_6;
+	LCD_D5=ACC_5;
+	LCD_D4=ACC_4;
+	LCD_pulse();
+	Timer3us(40);
+	ACC=x; //Send low nible
+	LCD_D7=ACC_3;
+	LCD_D6=ACC_2;
+	LCD_D5=ACC_1;
+	LCD_D4=ACC_0;
+	LCD_pulse();
+}
+
+
+void WriteData (unsigned char x)
+{
+	LCD_RS=1;
+	LCD_byte(x);
+	waitms(2);
+}
+
+void WriteCommand (unsigned char x)
+{
+	LCD_RS=0;
+	LCD_byte(x);
+	waitms(5);
+}
+
+void LCD_4BIT (void)
+{
+	LCD_E=0; // Resting state of LCD's enable is zero
+	// LCD_RW=0; // We are only writing to the LCD in this program
+	waitms(20);
+	// First make sure the LCD is in 8-bit mode and then change to 4-bit mode
+	WriteCommand(0x33);
+	WriteCommand(0x33);
+	WriteCommand(0x32); // Change to 4-bit mode
+	// Configure the LCD
+	WriteCommand(0x28);
+	WriteCommand(0x0c);
+	WriteCommand(0x01); // Clear screen command (takes some time)
+	waitms(20); // Wait for clear screen command to finsih.
+}
+
+void LCDprint(char * string, unsigned char line, bit clear)
+{
+	int j;
+	WriteCommand(line==2?0xc0:0x80);
+	waitms(5);
+	for(j=0; string[j]!=0; j++) WriteData(string[j]);// Write the message
+	if(clear) for(; j<CHARS_PER_LINE; j++) WriteData(' '); // Clear the rest ofthe line
+}
+
 void main (void)
 {
-	//float v_ref;
-	//float v_inp;
-	float half_period;
 	float period;
-	float ref_max_v;
-	float inp_max_v;
+	float ref_max_v = 0;
+	float inp_max_v = 0;
 	float max_v_time;
+	float peak_diff;
+	float phase = 0;
+	
+	float prevRefV;
+	float prevInpV;
+	float prevPhase;
+
+	char l1buff[16];
+	char l2buff[16];
 
 	TIMER0_Init();
 
@@ -233,7 +314,7 @@ void main (void)
 	        __FILE__, __DATE__, __TIME__);
 
 	InitPinADC(2, 5); // Configure P2.5 as analog input
-	InitPinADC(2, 6); // Configure P2.5 as analog input
+	InitPinADC(2, 6); // Configure P2.6 as analog input
     InitADC();
 
 
@@ -284,6 +365,7 @@ void main (void)
 		while (ADC_at_Pin(VREF_PIN)!=0); // Wait for the signal to be zero
 		while (ADC_at_Pin(VREF_PIN)==0); // Wait for the signal to be positive
 		waitms(max_v_time*1000);
+		prevRefV=ref_max_v;
 		ref_max_v = Volts_at_Pin(VREF_PIN);
 
 		printf("Ref Max = %7.5fV\r\n", ref_max_v);
@@ -291,6 +373,7 @@ void main (void)
 		while (ADC_at_Pin(VINP_PIN)!=0); // Wait for the signal to be zero
 		while (ADC_at_Pin(VINP_PIN)==0); // Wait for the signal to be positive
 		waitms(max_v_time*1000);
+		prevInpV=inp_max_v;
 		inp_max_v = Volts_at_Pin(VINP_PIN);
 
 		printf("Inp Max = %7.5fV\r\n", inp_max_v);
@@ -303,9 +386,17 @@ void main (void)
 		TF0=0;
 		overflow_count=0;
 
-		while (ADC_at_Pin(VREF_PIN)!=0); // Wait for the signal to be zero
+		while (ADC_at_Pin(VINP_PIN)!=0); // Wait for the ref signal to be zero
 		TR0=1; // Start the timer 0
-		while (ADC_at_Pin(VINP_PIN)!=0) // Wait for the signal to be positive
+		while (ADC_at_Pin(VREF_PIN)==0) // Wait for the signal to be pos again
+		{
+			if(TF0==1) // Did the 16-bit timer overflow?
+			{
+				TF0=0;
+				overflow_count++;
+			}
+		}
+		while (ADC_at_Pin(VREF_PIN)!=0) // Wait for the signal to be zero again
 		{
 			if(TF0==1) // Did the 16-bit timer overflow?
 			{
@@ -315,10 +406,26 @@ void main (void)
 		}
 		TR0=0;
 		peak_diff=(overflow_count*65536.0+TH0*256.0+TL0)*(12.0/SYSCLK);
+		prevPhase = phase;
 		phase = peak_diff * 360.0 / period;
+       
+       	if (phase > 360) {
+       		phase = prevPhase;
+       		ref_max_v = prevRefV;
+       		inp_max_v = prevInpV;
+       	}
+       
+	    if (phase > 180.0)
+            phase = phase-360;
+		
+		printf("Diff = %7.5fms\r\n", peak_diff*1000);
+		printf("Phase = %7.5fdeg\r\n\n", phase);
 
-		printf("Phase = %7.5fV\r\n", phase);
+		sprintf(l1buff, "R=%.2fV I=%.2fV", ref_max_v, inp_max_v);
+		LCDprint(l1buff, 1, 1);
 
+		sprintf(l2buff, "Phase=%.2fdeg", phase);
+		LCDprint(l2buff, 2, 1);
 
 		waitms(1000);
 	 }  
