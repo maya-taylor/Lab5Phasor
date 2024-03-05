@@ -1,7 +1,7 @@
 """Two travelling sine waves and phasors with phase diffs."""
 
-# Copyright 2022 Qi Tianshi.
-# Licensed under GNU GPL v3.0.
+# PHASOR ROTATION REFERENCED from : Copyright 2022 Qi Tianshi.
+# https://github.com/qitianshi/AC-animations?tab=readme-ov-file
 
 
 from matplotlib.animation import FuncAnimation
