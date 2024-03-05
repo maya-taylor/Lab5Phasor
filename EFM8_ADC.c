@@ -356,7 +356,7 @@ void main (void)
 		
 		period=2*(overflow_count*65536.0+TH0*256.0+TL0)*(12.0/SYSCLK);
 
-		printf("Period = %7.5fms\r\n", period*1000);
+		//printf("Period = %7.5fms\r\n", period*1000);
 
 		// Time from the beginning of the sine wave to its peak
 		//max_v_time=65536-(period/4);
@@ -368,7 +368,7 @@ void main (void)
 		prevRefV=ref_max_v;
 		ref_max_v = Volts_at_Pin(VREF_PIN);
 
-		printf("Ref Max = %7.5fV\r\n", ref_max_v);
+		//printf("Ref Max = %7.5fV\r\n", ref_max_v);
 
 		while (ADC_at_Pin(VINP_PIN)!=0); // Wait for the signal to be zero
 		while (ADC_at_Pin(VINP_PIN)==0); // Wait for the signal to be positive
@@ -376,7 +376,7 @@ void main (void)
 		prevInpV=inp_max_v;
 		inp_max_v = Volts_at_Pin(VINP_PIN);
 
-		printf("Inp Max = %7.5fV\r\n", inp_max_v);
+		//printf("Inp Max = %7.5fV\r\n", inp_max_v);
 		
 
 
@@ -418,8 +418,12 @@ void main (void)
 	    if (phase > 180.0)
             phase = phase-360;
 		
-		printf("Diff = %7.5fms\r\n", peak_diff*1000);
-		printf("Phase = %7.5fdeg\r\n\n", phase);
+		//printf("Diff = %7.5fms\r\n", peak_diff*1000);
+		//printf("Phase = %7.5fdeg\r\n\n", phase);
+		
+		printf("%.3f %.3f %.3f\r\n", ref_max_v, inp_max_v, phase);
+		
+		
 
 		sprintf(l1buff, "R=%.2fV I=%.2fV", ref_max_v, inp_max_v);
 		LCDprint(l1buff, 1, 1);
