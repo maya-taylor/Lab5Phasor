@@ -1,4 +1,3 @@
-"""Two travelling sine waves and phasors with phase diffs."""
 
 # PHASOR ROTATION REFERENCED from : Copyright 2022 Qi Tianshi.
 # https://github.com/qitianshi/AC-animations?tab=readme-ov-file
@@ -174,6 +173,7 @@ def _anim(i):
     #save to wave file
     write("sine.wav", AUDIO_RATE,ya)
     sine_file = "C:\\Users\\maya2\\Documents\\GitHub\\Lab5Phasor\\sine.wav"
+    #playing sine wave sound with each cycle
     sine_sound = pygame.mixer.Sound(sine_file)
     sine_sound.play()
     
