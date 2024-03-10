@@ -1,5 +1,5 @@
 
-# PHASOR ROTATION REFERENCED from : Copyright 2022 Qi Tianshi.
+# PHASOR ROTATION REFERENCED from Qi Tianshi.
 # https://github.com/qitianshi/AC-animations?tab=readme-ov-file
 
 
